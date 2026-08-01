@@ -1,0 +1,55 @@
+name: pvo
+description: P V O - movies, series and live channels.
+publish_to: 'none'
+version: 1.0.0+1
+
+environment:
+  sdk: '>=3.6.0 <4.0.0'
+
+dependencies:
+  flutter:
+    sdk: flutter
+  flutter_localizations:
+    sdk: flutter
+
+  # State management
+  flutter_riverpod: ^2.5.1
+
+  # Networking
+  dio: ^5.7.0
+
+  # Download engines
+  background_downloader: ^8.5.5
+
+  # Storage
+  hive: ^2.2.3
+  hive_flutter: ^1.1.0
+  flutter_secure_storage: ^9.2.2
+  path_provider: ^2.1.4
+  path: ^1.9.0
+
+  # Playback. media_kit wraps libmpv, which plays mkv, avi and raw ts. Apple's
+  # AVPlayer (used by video_player) cannot, and those are exactly the formats
+  # Xtream servers return, so video_player would fail on most of a library.
+  media_kit: ^1.1.11
+  media_kit_video: ^1.2.5
+  media_kit_libs_ios_video: ^1.1.4
+
+  # UI
+  cached_network_image: ^3.4.1
+  cupertino_icons: ^1.0.8
+  url_launcher: ^6.3.1
+
+  # Copies a finished video into the system photo library on request.
+  gal: ^2.3.1
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^4.0.0
+
+flutter:
+  uses-material-design: true
+  # No bundled assets: every image in the app comes from the server and is
+  # cached at runtime. Declaring an empty assets/ directory here would fail the
+  # build after a fresh clone, since git does not track empty directories.

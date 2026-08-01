@@ -1,0 +1,100 @@
+# Unsigned iOS build.
+#
+# No Apple Developer account, team id, certificate or provisioning profile is
+# referenced anywhere in this file or in the repository. The artifact produced
+# here is an UNSIGNED .ipa intended for an external signing service.
+#
+# `flutter build ipa` is deliberately not used: its export step always requires
+# a signing identity. The .app is built with signing disabled and packaged into
+# the Payload/ layout that defines an .ipa.
+
+definitions:
+  environment_base: &environment_base
+    flutter: stable
+    xcode: 16.2
+    cocoapods: default
+
+workflows:
+  ios-unsigned:
+    name: iOS - Unsigned IPA
+    instance_type: mac_mini_m2
+    max_build_duration: 60
+
+    environment:
+      <<: *environment_base
+      vars:
+        # The only value you need to change. Nothing else references an
+        # identity, and no Apple account data belongs in this file.
+        BUNDLE_ID: "com.iss10a.downloader"
+
+    cache:
+      cache_paths:
+        - $HOME/.pub-cache
+        - $CM_BUILD_DIR/ios/Pods
+
+    scripts:
+      - name: Generate iOS platform files if missing
+        script: |
+          set -e
+          for f in ios/Runner/Info.plist ios/Podfile; do
+            if [ ! -f "$f" ]; then
+              echo "error: $f is missing from the repository."
+              echo "Hidden and nested files may not have been committed."
+              exit 1
+            fi
+          done
+          if [ ! -d "ios/Runner.xcodeproj" ]; then
+            echo "Runner.xcodeproj absent - generating platform scaffolding."
+            [ -f .gitignore ] && cp .gitignore /tmp/gitignore.committed || true
+            cp ios/Runner/Info.plist        /tmp/Info.plist.committed
+            cp ios/Podfile                  /tmp/Podfile.committed
+
+            ORG="${BUNDLE_ID%.*}"
+            flutter create --platforms=ios --org "$ORG" \
+              --project-name pvo .
+
+            # flutter create overwrites these; restore the committed versions.
+            cp /tmp/Info.plist.committed        ios/Runner/Info.plist
+            cp /tmp/Podfile.committed           ios/Podfile
+
+            # `flutter create` also scaffolds a default test that instantiates
+            # MyApp (which this project does not define) and some IDE cruft.
+            rm -f  test/widget_test.dart
+            rm -f  pvo.iml
+            rm -rf .idea
+            [ -f /tmp/gitignore.committed ] && cp /tmp/gitignore.committed .gitignore || true
+          else
+            echo "Using the committed Xcode project."
+          fi
+
+      - name: Get Flutter packages
+        script: flutter pub get
+
+      - name: Static analysis
+        script: flutter analyze --no-fatal-infos
+
+      - name: Run unit tests
+        script: |
+          if [ "$(find test -name '*_test.dart' 2>/dev/null | wc -l)" -gt 0 ]; then
+            flutter test
+          else
+            echo "No tests found - skipping."
+          fi
+
+      - name: Apply bundle id and disable signing
+        script: bash tool/apply_ios_config.sh
+
+      - name: Install CocoaPods dependencies
+        script: |
+          cd ios && pod install --repo-update
+
+      - name: Build unsigned IPA
+        script: |
+          BUILD_NUMBER=$PROJECT_BUILD_NUMBER bash tool/build_unsigned_ipa.sh
+
+    artifacts:
+      - build/ios/ipa/*.ipa
+      - /tmp/xcodebuild_logs/*.log
+
+    # No publishing section: this build is not submitted anywhere. Download the
+    # .ipa from the build's Artifacts panel.
